@@ -159,10 +159,9 @@ class NetworkProbe:
     def check_redirect(url):
         if not url or not url.startswith('http'): return None
         try:
-            # Short timeout, we just want to know if it moved
             print(f"    [Probe] Checking {url}...")
             resp = requests.head(url, allow_redirects=True, timeout=5)
-            if resp.history: # If redirects happened
+            if resp.history:
                 final_url = resp.url
                 print(f"    [Probe] Redirect found: -> {final_url}")
                 return final_url
@@ -174,13 +173,11 @@ class LazarusEngine:
     """Tier 6: Content Recovery Protocol (MangaDex Integration)"""
     def __init__(self):
         self.session = requests.Session()
-        # MangaDex API rate limit is generous but let's be polite
         self.last_req = 0
     
     def find_manga(self, title, artist=None):
         if not title: return None
         
-        # Rate limit (2 req/sec)
         now = time.time()
         if now - self.last_req < 0.5:
             time.sleep(0.5)
@@ -188,7 +185,6 @@ class LazarusEngine:
 
         try:
             print(f"    [Lazarus] Searching Archive for: {title}")
-            # Search MangaDex
             params = {
                 'title': title,
                 'limit': 5,
@@ -199,18 +195,14 @@ class LazarusEngine:
                 results = resp.json().get('data', [])
                 for manga in results:
                     attr = manga.get('attributes', {})
-                    
-                    # Check Titles (en, ja, romaji)
                     alt_titles = [attr['title'].get('en')]
                     for alt in attr.get('altTitles', []):
                         alt_titles.extend(alt.values())
                     
-                    # Fuzzy match title
                     for t in alt_titles:
                         if t and StringUtils.is_close_match(StringUtils.normalize(title), StringUtils.normalize(t)):
-                            # Found a high confidence match!
                             print(f"    [Lazarus] MATCH FOUND: {t} ({manga['id']})")
-                            return manga['id'] # Return UUID
+                            return manga['id']
                             
         except Exception as e:
             print(f"    [Lazarus] Error: {e}")
@@ -269,18 +261,12 @@ class ResolutionEngine:
         self.lazarus = LazarusEngine()
 
     def resolve(self, k_name, k_url, k_title, k_artist):
-        """
-        Returns: (Source_ID, Source_Name, Method, Updated_Manga_URL)
-        """
-        
-        # 1. Domain Fingerprint
         if k_url:
             domain = StringUtils.clean_domain(k_url)
             if domain and domain in self.registry.domain_map:
                 sid = self.registry.domain_map[domain]
                 return (sid, self.registry.sources[sid]['name'], "DOMAIN", None)
 
-        # 2. Legacy Mapping
         norm_input = StringUtils.normalize(k_name)
         if norm_input in LEGACY_MAPPING:
             target = LEGACY_MAPPING[norm_input]
@@ -289,24 +275,20 @@ class ResolutionEngine:
                 sid = self.registry.name_map[target_norm]
                 return (sid, self.registry.sources[sid]['name'], "LEGACY", None)
                 
-        # 3. Name Match
         if norm_input in self.registry.name_map:
             sid = self.registry.name_map[norm_input]
             return (sid, self.registry.sources[sid]['name'], "NAME", None)
             
-        # 4. Fuzzy Match
         for known_norm, sid in self.registry.name_map.items():
             if StringUtils.is_close_match(norm_input, known_norm):
                  return (sid, self.registry.sources[sid]['name'], "FUZZY", None)
 
-        # 5. Semantic Match
         input_core = SemanticProcessor.extract_core_identity(k_name)
         if input_core in self.registry.core_map:
             candidates = self.registry.core_map[input_core]
             if len(candidates) == 1:
                 sid = candidates[0]
                 return (sid, self.registry.sources[sid]['name'], "SEMANTIC", None)
-            # Pick best length match
             best_sid, best_diff = None, 999
             for sid in candidates:
                 diff = abs(len(k_name) - len(self.registry.sources[sid]['name']))
@@ -315,10 +297,6 @@ class ResolutionEngine:
             if best_sid:
                 return (best_sid, self.registry.sources[best_sid]['name'], "SEMANTIC", None)
 
-        # --- ADVANCED INTELLIGENCE TIERS ---
-        
-        # 5. Active Network Probe (Pathfinder)
-        # Check if URL redirects to a known domain
         if k_url:
             new_url = NetworkProbe.check_redirect(k_url)
             if new_url:
@@ -327,16 +305,11 @@ class ResolutionEngine:
                     sid = self.registry.domain_map[new_domain]
                     return (sid, self.registry.sources[sid]['name'], "PROBE_REDIRECT", None)
 
-        # 6. Lazarus Protocol (Content Recovery)
-        # If we are here, the source is unknown/dead. Search MangaDex.
         if k_title:
             md_uuid = self.lazarus.find_manga(k_title, k_artist)
             if md_uuid:
-                # We found the manga on MangaDex!
-                # We must use MangaDex Source ID and update the URL to /manga/{uuid}
                 return (MANGADEX_SOURCE_ID, "MangaDex", "LAZARUS_RECOVERY", f"/manga/{md_uuid}")
 
-        # 7. Deterministic Fallback
         fallback_id = StringUtils.java_hash(k_name)
         return (fallback_id, k_name, "HASH", None)
 
@@ -361,20 +334,17 @@ def main():
     print("[System] Parsing backup...")
     try:
         with zipfile.ZipFile(KOTATSU_INPUT, 'r') as z:
-            # Load Favourites
             f_file = next((n for n in z.namelist() if 'favourites' in n), None)
             if not f_file: raise Exception("Favourites file not found.")
             with z.open(f_file) as f:
                 data = json.load(f)
 
-            # Load Categories
             categories_data = []
             c_file = next((n for n in z.namelist() if 'categories' in n), None)
             if c_file:
                 with z.open(c_file) as f:
                     categories_data = json.load(f)
 
-            # Load History
             history_data = []
             h_file = next((n for n in z.namelist() if 'history' in n), None)
             if h_file:
@@ -390,10 +360,10 @@ def main():
     registered = set()
     
     # Process Categories
-    cat_map = {} # Kotatsu ID -> Tachiyomi Order/Index
+    cat_map = {}
     for i, cat in enumerate(categories_data):
         bc = backup.backupCategories.add()
-        bc.name = cat.get('title', 'Unknown')
+        bc.name = cat.get('title', 'Unknown') if cat.get('title') is not None else 'Unknown'
         bc.order = i
         bc.flags = 0
         cat_map[cat.get('category_id')] = i
@@ -403,7 +373,7 @@ def main():
         'SEMANTIC': 0, 'PROBE_REDIRECT': 0, 'LAZARUS_RECOVERY': 0, 'HASH': 0
     }
 
-    manga_map = {} # Kotatsu Manga ID -> BackupManga Object
+    manga_map = {}
 
     for item in data:
         m = item.get('manga', {})
@@ -413,32 +383,34 @@ def main():
         title = m.get('title', '')
         artist = m.get('artist', '')
         
-        # Resolve
         sid, sname, method, new_url = engine.resolve(name, original_url, title, artist)
         stats[method] += 1
-        
-        # Use new URL if provided (Lazarus), otherwise original
         final_url = new_url if new_url else original_url
 
-        # Register Source
         if sid not in registered:
             s = backup.backupSources.add()
             s.sourceId = sid
-            s.name = sname
+            s.name = sname if sname is not None else 'Unknown'
             registered.add(sid)
             
-        # Register Manga
         bm = backup.backupManga.add()
         bm.source = sid
-        bm.url = final_url
-        bm.title = title
-        bm.artist = artist
-        bm.author = m.get('author', '')
-        bm.description = m.get('description', '')
-        bm.thumbnailUrl = m.get('cover_url', '')
-        bm.dateAdded = int(item.get('created_at', 0)) if item.get('created_at') else 0
+        bm.url = final_url if final_url is not None else ''
+        bm.title = title if title is not None else ''
         
-        # Tachiyomi dateAdded is usually in ms
+        artist_val = m.get('artist', '')
+        bm.artist = artist_val if artist_val is not None else ''
+        
+        author_val = m.get('author', '')
+        bm.author = author_val if author_val is not None else ''
+        
+        desc_val = m.get('description', '')
+        bm.description = desc_val if desc_val is not None else ''
+        
+        thumb_val = m.get('cover_url', '')
+        bm.thumbnailUrl = thumb_val if thumb_val is not None else ''
+        
+        bm.dateAdded = int(item.get('created_at', 0)) if item.get('created_at') else 0
         if bm.dateAdded < 10**12: bm.dateAdded *= 1000
 
         st = (m.get('state') or '').upper()
@@ -453,28 +425,21 @@ def main():
             elif t:
                 bm.genre.append(str(t))
 
-        # Assign Category
+        # Assign Category Safely
         cid = item.get('category_id')
-        if cid in cat_map:
-            bm.categories.append(cat_map[cid])
+        if cid in cat_map and cat_map[cid] is not None:
+            bm.categories.append(int(cat_map[cid]))
 
         if kotatsu_manga_id:
             manga_map[kotatsu_manga_id] = bm
 
-    # Process History
     print(f"[System] Processing history for {len(history_data)} items...")
     for h in history_data:
         mid = h.get('manga_id')
         if mid in manga_map:
-            bm = manga_map[mid]
-            # Kotatsu doesn't seem to provide chapter URL easily in history file
-            # But we can at least record last read time if we had a chapter
-            # Tachiyomi needs a chapter URL for history.
-            # If we don't have it, we might skip or use a placeholder if we really want it.
-            # However, Kotatsu history entries often don't have the chapter URL.
             pass
 
-    # Write
+    # Write output
     out_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
     with gzip.open(out_path, 'wb') as f:
         f.write(backup.SerializeToString())
@@ -487,11 +452,12 @@ def main():
     print(f"  [TIER 2] Legacy Bridge:    {stats['LEGACY']}")
     print(f"  [TIER 3] Name Match:       {stats['NAME']} / {stats['FUZZY']}")
     print(f"  [TIER 4] Semantic AI:      {stats['SEMANTIC']}")
-    print(f"  [TIER 5] Network Probe:    {stats['PROBE_REDIRECT']} (Redirects Found)")
-    print(f"  [TIER 6] Lazarus Recovery: {stats['LAZARUS_RECOVERY']} (Recovered via MangaDex)")
+    print(f"  [TIER 5] Network Probe:    {stats['PROBE_REDIRECT']}")
+    print(f"  [TIER 6] Lazarus Recovery: {stats['LAZARUS_RECOVERY']}")
     print(f"  [TIER 7] Hash Fallback:    {stats['HASH']}")
     print("-" * 50)
     print(f"Artifact: {out_path}")
 
 if __name__ == "__main__":
     main()
+        

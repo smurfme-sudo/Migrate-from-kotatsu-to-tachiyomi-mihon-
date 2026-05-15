@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Kotatsu to Tachiyomi Migration Utility
-Version: 6.9.8
-Status: Stable 
+Version: 6.9.9
+Status: Production Stable
 """
 
 import os
@@ -359,14 +359,37 @@ def main():
     backup = tachiyomi_pb2.Backup()
     registered = set()
     
-    # Process Categories
+    # --- Fortified Category Mapping Matrix ---
     cat_map = {}
-    for i, cat in enumerate(categories_data):
+    has_read_later = False
+    
+    # Force scanning context to verify if "Read Later" collection was supplied by Kotatsu
+    for cat in categories_data:
+        title_str = str(cat.get('title', '')).strip().lower()
+        if title_str in ['read later', 'read_later', 'baca nanti']:
+            has_read_later = True
+
+    # Inject default collection bucket targeting order index 0 if missing
+    start_index = 0
+    if not has_read_later:
         bc = backup.backupCategories.add()
-        bc.name = cat.get('title', 'Unknown') if cat.get('title') is not None else 'Unknown'
-        bc.order = i
+        bc.name = "Read Later"
+        bc.order = 0
         bc.flags = 0
-        cat_map[cat.get('category_id')] = i
+        cat_map[0] = 0
+        cat_map[None] = 0
+        start_index = 1
+
+    for i, cat in enumerate(categories_data, start=start_index):
+        bc = backup.backupCategories.add()
+        title_name = cat.get('title', 'Unknown')
+        bc.name = title_name if title_name is not None else 'Unknown'
+        bc.order = i
+        bc.flags = 0  # Resets operational layer flag mapping bits
+        
+        orig_cid = cat.get('category_id')
+        if orig_cid is not None:
+            cat_map[orig_cid] = i
 
     stats = {
         'DOMAIN': 0, 'LEGACY': 0, 'NAME': 0, 'FUZZY': 0, 
@@ -396,11 +419,9 @@ def main():
         bm = backup.backupManga.add()
         bm.source = sid
         
-        # Ensure mandatory tracking components pass string mapping even if blank
         bm.url = str(final_url) if final_url is not None else ''
         bm.title = str(title) if title is not None else 'Untitled Manga'
         
-        # Safeguard structural serialization fields strictly checking against Python None type objects
         artist_val = m.get('artist')
         if artist_val is not None and str(artist_val).strip() != '':
             bm.artist = str(artist_val)
@@ -432,10 +453,13 @@ def main():
             elif t:
                 bm.genre.append(str(t))
 
-        # Assign Category Safely
+        # --- Safe and Absolute Structural Category Assignment ---
         cid = item.get('category_id')
         if cid in cat_map and cat_map[cid] is not None:
             bm.categories.append(int(cat_map[cid]))
+        else:
+            # Re-routes clean tracking pointers down to the index 0 "Read Later" tab container matrix
+            bm.categories.append(0)
 
         if kotatsu_manga_id:
             manga_map[kotatsu_manga_id] = bm
@@ -452,7 +476,7 @@ def main():
         f.write(backup.SerializeToString())
 
     print("-" * 50)
-    print(f"MIGRATION COMPLETE (v6.9.8)")
+    print(f"MIGRATION COMPLETE (v6.9.9)")
     print(f"Total Processed: {len(data)}")
     print("-" * 20)
     print(f"  [TIER 1] Domain Match:     {stats['DOMAIN']}")

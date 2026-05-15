@@ -17,5 +17,7 @@ This repository uses a **GitHub Action** to:
 
 ## Changes
 The Category and Structural Flag Fixes: Kotatsu's absolute category_id values mapping matrices (1, 2, 3, 4) were bound to Mihon's relative array elements.
+
 Custom multi-tab item linkage filters, protective typecast variables, and deduplication memory tracking layers.
+
 Integrates explicit high-capacity string-buffer decoding. It reads the raw uncompressed JSON directly into high-memory blocks so that it anle to process up to 1,798 structural tab entries.

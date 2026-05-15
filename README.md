@@ -20,4 +20,4 @@ The Category and Structural Flag Fixes: Kotatsu's absolute category_id values ma
 
 Custom multi-tab item linkage filters, protective typecast variables, and deduplication memory tracking layers.
 
-Integrates explicit high-capacity string-buffer decoding. It reads the raw uncompressed JSON directly into high-memory blocks so that it anle to process up to 1,798 structural tab entries.
+Integrates explicit high-capacity string-buffer decoding. It reads the raw uncompressed JSON directly into high-memory blocks so that it able to process up to 1,798 structural tab entries.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Kotatsu to Tachiyomi Migration Utility
-Version: 6.9.7 
+Version: 6.9.8
 Status: Stable 
 """
 
@@ -396,26 +396,25 @@ def main():
         bm = backup.backupManga.add()
         bm.source = sid
         
-        if final_url:
-            bm.url = str(final_url)
-        if title:
-            bm.title = str(title)
+        # Ensure mandatory tracking components pass string mapping even if blank
+        bm.url = str(final_url) if final_url is not None else ''
+        bm.title = str(title) if title is not None else 'Untitled Manga'
         
-        # Omit blank text strings entirely from structural serialization to respect Mihon's model loader
+        # Safeguard structural serialization fields strictly checking against Python None type objects
         artist_val = m.get('artist')
-        if artist_val:
+        if artist_val is not None and str(artist_val).strip() != '':
             bm.artist = str(artist_val)
         
         author_val = m.get('author')
-        if author_val:
+        if author_val is not None and str(author_val).strip() != '':
             bm.author = str(author_val)
         
         desc_val = m.get('description')
-        if desc_val:
+        if desc_val is not None and str(desc_val).strip() != '':
             bm.description = str(desc_val)
             
         thumb_val = m.get('cover_url') or m.get('thumbnail_url')
-        if thumb_val:
+        if thumb_val is not None and str(thumb_val).strip() != '':
             bm.thumbnailUrl = str(thumb_val)
         
         bm.dateAdded = int(item.get('created_at', 0)) if item.get('created_at') else 0
@@ -453,7 +452,7 @@ def main():
         f.write(backup.SerializeToString())
 
     print("-" * 50)
-    print(f"MIGRATION COMPLETE (v6.9.7)")
+    print(f"MIGRATION COMPLETE (v6.9.8)")
     print(f"Total Processed: {len(data)}")
     print("-" * 20)
     print(f"  [TIER 1] Domain Match:     {stats['DOMAIN']}")
@@ -468,4 +467,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        

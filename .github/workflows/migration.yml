@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run Migration Script (v6.6.6)
+      - name: Run Migration Script (v6.9.6)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python

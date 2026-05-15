@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Kotatsu to Tachiyomi Migration Utility
-Version: 6.9.6 
+Version: 6.9.7 
 Status: Stable 
 """
 
@@ -395,20 +395,28 @@ def main():
             
         bm = backup.backupManga.add()
         bm.source = sid
-        bm.url = final_url if final_url is not None else ''
-        bm.title = title if title is not None else ''
         
-        artist_val = m.get('artist', '')
-        bm.artist = artist_val if artist_val is not None else ''
+        if final_url:
+            bm.url = str(final_url)
+        if title:
+            bm.title = str(title)
         
-        author_val = m.get('author', '')
-        bm.author = author_val if author_val is not None else ''
+        # Omit blank text strings entirely from structural serialization to respect Mihon's model loader
+        artist_val = m.get('artist')
+        if artist_val:
+            bm.artist = str(artist_val)
         
-        desc_val = m.get('description', '')
-        bm.description = desc_val if desc_val is not None else ''
+        author_val = m.get('author')
+        if author_val:
+            bm.author = str(author_val)
         
-        thumb_val = m.get('cover_url', '')
-        bm.thumbnailUrl = thumb_val if thumb_val is not None else ''
+        desc_val = m.get('description')
+        if desc_val:
+            bm.description = str(desc_val)
+            
+        thumb_val = m.get('cover_url') or m.get('thumbnail_url')
+        if thumb_val:
+            bm.thumbnailUrl = str(thumb_val)
         
         bm.dateAdded = int(item.get('created_at', 0)) if item.get('created_at') else 0
         if bm.dateAdded < 10**12: bm.dateAdded *= 1000
@@ -445,7 +453,7 @@ def main():
         f.write(backup.SerializeToString())
 
     print("-" * 50)
-    print(f"MIGRATION COMPLETE (v6.9.6)")
+    print(f"MIGRATION COMPLETE (v6.9.7)")
     print(f"Total Processed: {len(data)}")
     print("-" * 20)
     print(f"  [TIER 1] Domain Match:     {stats['DOMAIN']}")
